@@ -1,0 +1,53 @@
+import logging
+
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from uuid import uuid4
+import aiofiles
+import os
+
+from s3_utils import upload_to_s3
+from queue_utils import send_to_processing_queue
+from logger import get_logger
+
+router = APIRouter()
+logger = get_logger("upload_service")
+
+
+@router.post("/api/books/upload")
+async def upload_book(file: UploadFile = File(...), user_id: str = Form(...)):
+    try:
+        # Generate IDs and paths
+        logger.info("Starting upload for user: %s for file %s", user_id, file)
+        book_id = str(uuid4())
+        file_ext = file.filename.split('.')[-1]
+        s3_key = f"books/{user_id}/{book_id}/original.{file_ext}"
+        local_path = f"/tmp/{book_id}.{file_ext}"
+
+        # Save file temporarily to /tmp
+        async with aiofiles.open(local_path, 'wb') as out_file:
+            content = await file.read()
+            await out_file.write(content)
+
+        # Upload to S3
+        file_upload_status = upload_to_s3(local_path, s3_key)
+        logger.info("Status of S3 upload %s", file_upload_status)
+
+        # Send SQS message
+        send_to_processing_queue({
+            "user_id": user_id,
+            "book_id": book_id,
+            "s3_key": s3_key,
+            "file_type": file_ext
+        })
+
+        # Cleanup
+        os.remove(local_path)
+
+        return {
+            "message": "Book uploaded and processing started.",
+            "book_id": book_id,
+            "s3_key": s3_key
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")

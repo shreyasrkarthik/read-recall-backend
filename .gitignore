@@ -1,0 +1,64 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# Virtual environments
+venv/
+.env/
+
+# macOS system files
+.DS_Store
+
+# Editor folders
+.vscode/
+.idea/
+
+# Environment variable files
+*.env
+*.env.*
+
+# Log files
+*.log
+
+# AWS CLI credentials cache (if any)
+.aws/
+
+# Temp files & uploads
+tmp/
+temp/
+*.bak
+*.swp
+*.tmp
+
+# SQLite DB (if used for local testing)
+*.sqlite3
+
+# Uvicorn reloads or PID files
+*.pid
+
+# Coverage/reporting/test artifacts
+htmlcov/
+.coverage
+.tox/
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.cover
+.cache
+junit-*.xml
+
+# Docker-related
+*.tar
+docker-compose.override.yml
+
+# Ignore compiled models or shared outputs
+upload_service/__pycache__/
+upload_service/*.pyc
+upload_service/*.pyo
+upload_service/*.log
+
+# Ignore test uploads
+/tmp/
