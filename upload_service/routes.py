@@ -51,3 +51,33 @@ async def upload_book(file: UploadFile = File(...), user_id: str = Form(...)):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+@router.post("/api/covers/upload")
+async def upload_cover(file: UploadFile = File(...), user_id: str = Form(...), book_id: str = Form(...)):
+    try:
+        # Generate paths
+        logger.info("Starting cover upload for user: %s, book: %s, file: %s", user_id, book_id, file)
+        file_ext = file.filename.split('.')[-1]
+        s3_key = f"books/{user_id}/{book_id}/cover.{file_ext}"
+        local_path = f"/tmp/cover_{book_id}.{file_ext}"
+
+        # Save file temporarily to /tmp
+        async with aiofiles.open(local_path, 'wb') as out_file:
+            content = await file.read()
+            await out_file.write(content)
+
+        # Upload to S3
+        file_upload_status = upload_to_s3(local_path, s3_key)
+        logger.info("Status of S3 upload %s", file_upload_status)
+
+        # Cleanup
+        os.remove(local_path)
+
+        return {
+            "message": "Cover uploaded successfully.",
+            "book_id": book_id,
+            "s3_key": s3_key
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cover upload failed: {str(e)}")
