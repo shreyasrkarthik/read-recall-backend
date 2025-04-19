@@ -1,13 +1,11 @@
-import logging
-
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from uuid import uuid4
 import aiofiles
 import os
 
-from s3_utils import upload_to_s3
+from shared.s3_utils import upload_to_s3
 from queue_utils import send_to_processing_queue
-from logger import get_logger
+from shared.logger import get_logger
 
 router = APIRouter()
 logger = get_logger("upload_service")
@@ -19,7 +17,7 @@ async def upload_book(file: UploadFile = File(...), user_id: str = Form(...)):
         # Generate IDs and paths
         logger.info("Starting upload for user: %s for file %s", user_id, file)
         book_id = str(uuid4())
-        file_ext = file.filename.split('.')[-1]
+        file_ext = file.filename.split('.')[-1].lower()
         s3_key = f"books/{user_id}/{book_id}/original.{file_ext}"
         local_path = f"/tmp/{book_id}.{file_ext}"
 
@@ -51,6 +49,7 @@ async def upload_book(file: UploadFile = File(...), user_id: str = Form(...)):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
 
 @router.post("/api/covers/upload")
 async def upload_cover(file: UploadFile = File(...), user_id: str = Form(...), book_id: str = Form(...)):
