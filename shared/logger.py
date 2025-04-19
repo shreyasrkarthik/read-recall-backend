@@ -14,4 +14,4 @@ def get_logger(name: str) -> logging.Logger:
 
         logger.addHandler(console_handler)
 
-    return logger
+    return logger 
