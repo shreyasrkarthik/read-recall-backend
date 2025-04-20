@@ -2,6 +2,7 @@
 Google Gemini2‑flash to generate concise recaps."""
 
 import json
+import logging
 import math
 import os
 import time
@@ -15,7 +16,7 @@ GEMINI_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
     "gemini-2.0-flash:generateContent?key={api_key}"
 )
-logger = get_logger("summarizer")
+logger = get_logger("characters")
 
 
 def _flatten_paragraphs(book_json: dict) -> List[str]:
@@ -63,10 +64,11 @@ def _call_gemini(prompt: str, text: str) -> str:
     )
 
 
-def _summarize_text(text: str) -> str:
+def _get_characters(text: str) -> str:
     prompt = (
-        "Provide a concise recap under 250-300 words of the following book content."
-        "Focus on key events and characters"
+        "Provide a concise list of all the characters appeared in the book similar to x-ray feature of prime video."
+        "This character list should also have a one liner about the character."
+        "Just give me the list and not anything else."
     )
     try:
         return _call_gemini(prompt, text)
@@ -75,28 +77,27 @@ def _summarize_text(text: str) -> str:
         return text[:400] + " …[truncated]" if len(text) > 400 else text
 
 
-def generate_percentage_summaries(book_json: dict) -> List[Dict]:
+def generate_percentage_characters(book_json: dict) -> List[Dict]:
+    # Flatten to one big string
     full_text = "".join(_flatten_paragraphs(book_json))
     total_len = len(full_text)
     if total_len == 0:
         return []
 
-    summaries: List[Dict] = []
+    characters: List[Dict] = []
     last_end = -1
 
     for pct in range(PERCENT_STEP, 101, PERCENT_STEP):
-        logger.info("Total %s, PCT %s", total_len, pct)
         end_idx = math.ceil(total_len * pct / 100)
         if end_idx == last_end:
             continue
         slice_text = full_text[:end_idx]
         logger.info("Slice Text %s", len(slice_text))
-        summary = _summarize_text(slice_text)
-
-        summaries.append({
+        text_characters = _get_characters(slice_text)
+        characters.append({
             "percent": pct,
-            "summary": summary,
+            "characters": text_characters,
         })
         last_end = end_idx
 
-    return summaries
+    return characters
