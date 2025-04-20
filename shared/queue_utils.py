@@ -23,3 +23,15 @@ def send_to_normalized_queue(message: dict):
     except Exception as e:
         logger.exception("Error sending to normalized queue: %s", str(e))
         raise
+
+
+def send_to_processing_queue(message: dict):
+    try:
+        sqs.send_message(
+            QueueUrl=BOOK_PROCESSING_QUEUE_URL,
+            MessageBody=json.dumps(message)
+        )
+        logger.info("SQS message sent successfully.")
+    except Exception as e:
+        logger.exception("SQS message failed: %s", str(e))
+        raise

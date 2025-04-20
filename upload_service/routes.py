@@ -4,7 +4,7 @@ import aiofiles
 import os
 
 from shared.s3_utils import upload_to_s3
-from queue_utils import send_to_processing_queue
+from shared.queue_utils import send_to_processing_queue
 from shared.logger import get_logger
 
 router = APIRouter()

@@ -1,4 +1,8 @@
 import boto3
+import tempfile
+import os
+import json
+
 from shared.config import AWS_BUCKET, AWS_REGION, AWS_ACCESS_KEY, AWS_SECRET_KEY
 from shared.logger import get_logger
 
@@ -29,4 +33,15 @@ def download_from_s3(s3_key: str, local_path: str):
         return True
     except Exception as e:
         logger.exception("S3 download failed: %s", str(e))
-        raise 
+        raise
+
+
+def download_json_from_s3(key: str) -> dict:
+    fd, tmp = tempfile.mkstemp()
+    os.close(fd)
+    s3.download_file(AWS_BUCKET, key, tmp)
+    with open(tmp, "r", encoding="utf-8") as fp:
+        data = json.load(fp)
+    os.remove(tmp)
+    return data
+

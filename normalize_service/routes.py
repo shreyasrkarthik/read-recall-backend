@@ -1,13 +1,12 @@
 import os
 import json
-from fastapi import APIRouter, Body, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
 import tempfile
 from shared.logger import get_logger
 from shared.s3_utils import download_from_s3, upload_to_s3
 from book_utils import normalize_book
-from queue_utils import send_to_normalized_queue
+from shared.queue_utils import send_to_normalized_queue
 
 router = APIRouter()
 logger = get_logger("normalize_service")
