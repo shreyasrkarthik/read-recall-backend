@@ -1,9 +1,10 @@
 import boto3
+import botocore
 import tempfile
 import os
 import json
 
-from shared.config import AWS_BUCKET, AWS_REGION, AWS_ACCESS_KEY, AWS_SECRET_KEY
+from shared.config import AWS_BUCKET, AWS_REGION, AWS_ACCESS_KEY, AWS_SECRET_KEY, SIGNED_URL_TTL_SEC
 from shared.logger import get_logger
 
 logger = get_logger("s3_utils")
@@ -14,6 +15,22 @@ s3 = boto3.client(
     aws_access_key_id=AWS_ACCESS_KEY,
     aws_secret_access_key=AWS_SECRET_KEY
 )
+
+
+def presigned_put_url(key: str, ttl: int = SIGNED_URL_TTL_SEC) -> str:
+    """
+    Return a one‑time pre‑signed URL that lets the browser upload directly to S3.
+    """
+    try:
+        return s3.generate_presigned_url(
+            ClientMethod="put_object",
+            Params={"Bucket": AWS_BUCKET, "Key": key},
+            ExpiresIn=ttl,
+            HttpMethod="PUT",
+        )
+    except Exception as e:
+        logger.exception("Failed to presign URL for %s: %s", key, e)
+        raise
 
 
 def upload_to_s3(local_path: str, s3_key: str):

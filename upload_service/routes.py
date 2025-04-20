@@ -3,12 +3,38 @@ from uuid import uuid4
 import aiofiles
 import os
 
-from shared.s3_utils import upload_to_s3
+from shared.s3_utils import upload_to_s3, presigned_put_url
 from shared.queue_utils import send_to_processing_queue
 from shared.logger import get_logger
+from shared.config import SIGNED_URL_TTL_SEC
 
 router = APIRouter()
 logger = get_logger("upload_service")
+
+
+@router.post("/api/books/upload-url")
+async def get_book_upload_url(
+    user_id: str = Form(...),
+    file_ext: str = Form(...),          # client sends ".epub", ".pdf", …
+):
+    try:
+        book_id = str(uuid4())
+        s3_key = f"books/{user_id}/{book_id}/original.{file_ext.lstrip('.')}"
+        upload_url = presigned_put_url(s3_key)
+        logger.info("Pre signed URL is %s", upload_url)
+
+        # 🛈  If you **must** keep the old queue‑first flow,
+        #     leave this line; otherwise delete it and use an S3 event
+        # send_to_processing_queue({"user_id": user_id, "book_id": book_id, "s3_key": s3_key})
+
+        return {
+            "book_id":    book_id,
+            "s3_key":     s3_key,
+            "upload_url": upload_url,
+            "expires_in": SIGNED_URL_TTL_SEC,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not create upload URL: {e}")
 
 
 @router.post("/api/books/upload")

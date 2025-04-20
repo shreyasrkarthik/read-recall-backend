@@ -1,6 +1,7 @@
 fastapi
 uvicorn
 boto3
+botocore
 python-multipart
 python-dotenv
 dotenv
@@ -11,3 +12,4 @@ ebooklib
 transformers
 torch
 requests
+botocore
