@@ -62,3 +62,5 @@ upload_service/*.log
 
 # Ignore test uploads
 /tmp/
+.aws-sam
+samconfig.toml
