@@ -1,0 +1,36 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Lambda to generate a presigned S3 URL
+
+Resources:
+  SummarizeBookFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: bookSummaryLambda
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      CodeUri: book_summary_lambda/
+      MemorySize: 512
+      Timeout: 60
+      Environment:
+        Variables:
+          GEMINI_API_KEY: AIzaSyCxTUNazbpORtLGriYAprTS3tIfizkCb0g
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - S3ReadPolicy:
+            BucketName: your-test-bucket-name
+  GeneratePresignedUrlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: generatePresignedUploadUrl
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      CodeUri: generatePresignedUploadUrl/
+      MemorySize: 128
+      Timeout: 10
+      Environment:
+        Variables:
+          BUCKET_NAME: book-processing-uploads
+      Policies:
+        - S3WritePolicy:
+            BucketName: book-processing-uploads
