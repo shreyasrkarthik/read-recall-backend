@@ -57,7 +57,7 @@ Resources:
       FunctionName: bookSummaryLambda
       Handler: app.lambda_handler
       Runtime: python3.9
-      CodeUri: book_summary_lambda/
+      CodeUri: lambdas/book_summary_lambda/
       MemorySize: 512
       Timeout: 60
       Environment:
@@ -74,7 +74,7 @@ Resources:
       FunctionName: generatePresignedUploadUrl
       Handler: app.lambda_handler
       Runtime: python3.9
-      CodeUri: generatePresignedUploadUrl/
+      CodeUri: lambdas/generatePresignedUploadUrl/
       MemorySize: 128
       Timeout: 10
       Environment:
