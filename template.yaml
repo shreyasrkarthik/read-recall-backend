@@ -1,0 +1,67 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  CloudFormation template for a Python Lambda function triggered by SQS, outputting to S3.
+
+Parameters:
+  OutputBucketNameParameter:
+    Type: String
+    Description: The name of the S3 bucket where processed data will be stored.
+    Default: normalized-book-bucket # Choose a unique bucket name
+
+Resources:
+  # SQS Queue that triggers the Lambda function
+  InputQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: book-normalize-queue-cf # You can change this name
+      VisibilityTimeout: 305 # Set visibility timeout >= function timeout (300s)
+
+  # S3 Bucket to store the output
+  OutputBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref OutputBucketNameParameter
+
+  # Lambda Function triggered by SQS
+  SqsToS3LambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: normalize-books # You can change this name
+      CodeUri: lambdas/normalize_books # <-- CHANGE THIS: Directory containing your Lambda code (e.g., handler.py)
+      Handler: normalize_lambda.lambda_handler # <-- CHANGE THIS: File and function name (e.g., handler.lambda_handler)
+      Runtime: python3.9 # Specify your Python runtime
+      MemorySize: 512
+      Timeout: 300
+      Environment:
+        Variables:
+          OUTPUT_BUCKET: !Ref OutputBucket # Pass bucket name to Lambda environment
+      Policies:
+        # Policy to allow reading from the SQS queue
+        - SQSPollerPolicy:
+            QueueName: !GetAtt InputQueue.QueueName
+        # Policy to allow writing to the S3 bucket
+        - S3WritePolicy:
+            BucketName: !Ref OutputBucketNameParameter
+      Events:
+        # Define the SQS trigger
+        SqsEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt InputQueue.Arn
+            BatchSize: 1 # Process up to 10 messages at a time (adjust as needed)
+            Enabled: true
+
+Outputs:
+  SqsToS3LambdaFunctionArn:
+    Description: "ARN of the SQS to S3 Lambda Function"
+    Value: !GetAtt SqsToS3LambdaFunction.Arn
+  InputQueueUrl:
+    Description: "URL of the Input SQS Queue"
+    Value: !Ref InputQueue
+  InputQueueArn:
+    Description: "ARN of the Input SQS Queue"
+    Value: !GetAtt InputQueue.Arn
+  OutputBucketName:
+    Description: "Name of the Output S3 Bucket"
+    Value: !Ref OutputBucket

@@ -1,0 +1,4 @@
+ebooklib
+boto3
+PyMuPDF
+# Add any other direct dependencies for normalize_lambda.py here 

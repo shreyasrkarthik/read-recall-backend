@@ -1,0 +1,88 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'CloudFormation template for a Python Lambda function triggered by SQS,
+  outputting to S3.
+
+  '
+Parameters:
+  OutputBucketNameParameter:
+    Type: String
+    Description: The name of the S3 bucket where processed data will be stored.
+    Default: normalized-book-bucket
+Resources:
+  InputQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: book-normalize-queue-cf
+      VisibilityTimeout: 305
+  OutputBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Ref: OutputBucketNameParameter
+  SqsToS3LambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: normalize-books
+      CodeUri: SqsToS3LambdaFunction
+      Handler: normalize_lambda.lambda_handler
+      Runtime: python3.9
+      MemorySize: 512
+      Timeout: 300
+      Environment:
+        Variables:
+          OUTPUT_BUCKET:
+            Ref: OutputBucket
+      Policies:
+      - SQSPollerPolicy:
+          QueueName:
+            Fn::GetAtt:
+            - InputQueue
+            - QueueName
+      - S3WritePolicy:
+          BucketName:
+            Ref: OutputBucketNameParameter
+      Events:
+        SqsEvent:
+          Type: SQS
+          Properties:
+            Queue:
+              Fn::GetAtt:
+              - InputQueue
+              - Arn
+            BatchSize: 1
+            Enabled: true
+      Layers:
+      - Fn::GetAtt:
+        - AwsSamAutoDependencyLayerNestedStack
+        - Outputs.SqsToS3LambdaFunction0a071e09DepLayer
+    Metadata:
+      SamResourceId: SqsToS3LambdaFunction
+  AwsSamAutoDependencyLayerNestedStack:
+    DeletionPolicy: Delete
+    Metadata:
+      CreatedBy: AWS SAM CLI sync command
+    Properties:
+      TemplateURL: /Users/srk/PycharmProjects/read-recall-backend/.aws-sam/auto-dependency-layer/adl_nested_template.yaml
+    Type: AWS::CloudFormation::Stack
+Outputs:
+  SqsToS3LambdaFunctionArn:
+    Description: ARN of the SQS to S3 Lambda Function
+    Value:
+      Fn::GetAtt:
+      - SqsToS3LambdaFunction
+      - Arn
+  InputQueueUrl:
+    Description: URL of the Input SQS Queue
+    Value:
+      Ref: InputQueue
+  InputQueueArn:
+    Description: ARN of the Input SQS Queue
+    Value:
+      Fn::GetAtt:
+      - InputQueue
+      - Arn
+  OutputBucketName:
+    Description: Name of the Output S3 Bucket
+    Value:
+      Ref: OutputBucket
