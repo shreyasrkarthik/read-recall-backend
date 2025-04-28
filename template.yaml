@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: CloudFormation template for a Python Lambda functions.
 
@@ -7,13 +7,17 @@ Parameters:
     Type: String
     Description: The name of the S3 bucket where processed data will be stored.
     Default: normalized-book-bucket # Choose a unique bucket name
+  GEMINI_API_KEY:
+    Type: String
+    Description: api key of gemini
+    Default:
 
 Resources:
   # SQS Queue that triggers the Lambda function
   InputQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: book-normalize-queue-cf # You can change this name
+      QueueName: book-processing-queue # You can change this name
       VisibilityTimeout: 305 # Set visibility timeout >= function timeout (300s)
 
   # S3 Bucket to store the output
@@ -50,7 +54,7 @@ Resources:
             Queue: !GetAtt InputQueue.Arn
             BatchSize: 1 # Process up to 10 messages at a time (adjust as needed)
             Enabled: true
-  
+
   SummarizeBookFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -62,12 +66,29 @@ Resources:
       Timeout: 60
       Environment:
         Variables:
-          GEMINI_API_KEY: AIzaSyCxTUNazbpORtLGriYAprTS3tIfizkCb0g
+          GEMINI_API_KEY: !Ref GEMINI_API_KEY
       Policies:
         - AWSLambdaBasicExecutionRole
         - S3ReadPolicy:
-            BucketName: your-test-bucket-name
-  
+            BucketName: normalized-books
+
+  SummarizeCharacterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: characterSummaryLambda
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      CodeUri: lambdas/character_summary_lambda/
+      MemorySize: 512
+      Timeout: 900
+      Environment:
+        Variables:
+          GEMINI_API_KEY: !Ref GEMINI_API_KEY
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - S3ReadPolicy:
+            BucketName: normalized-books
+
   GeneratePresignedUrlFunction:
     Type: AWS::Serverless::Function
     Properties:
