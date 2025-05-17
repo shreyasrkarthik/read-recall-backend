@@ -4,26 +4,27 @@ import boto3
 import os
 
 s3_client = boto3.client('s3')
-BUCKET_NAME = os.environ.get("BUCKET_NAME") or "book-processing-uploads"  # Set this in Lambda environment variables
+BUCKET_NAME = os.environ.get("BUCKET_NAME", "book-processing-uploads") # Set this in Lambda environment variables
 
 ALLOWED_EXTENSIONS = {".pdf", ".epub"}
 
 def lambda_handler(event, context):
+    print(event)
     try:
         # Ensure the body is a string before attempting to load it
-        if isinstance(event.get("body"), str):
-            body = json.loads(event.get("body", "{}"))
-        else:
+        try:
+            body = json.loads(event.get("body", {}))
+        except Exception as e:
             return {
                 "statusCode": 400,
-                "body": json.dumps({"error": "Invalid body format"})
+                "body": json.dumps({"error": str(e)})
             }
 
         # Extract the necessary fields
         user_id = body.get("user_id")
         file_name = body.get("file_name", "")
         file_ext = os.path.splitext(file_name)[-1].lower()
-
+        print("Fields", user_id, file_name, file_ext)
         # Validate input
         if not user_id or file_ext not in ALLOWED_EXTENSIONS:
             return {

@@ -13,17 +13,17 @@ logger.setLevel(logging.INFO)
 
 # Constants
 PERCENT_STEP = 5
-# Environment variable for the summaries table name (matches SAM template)
-DDB_SUMMARIES_TABLE_NAME = os.getenv("DDB_SUMMARIES_TABLE", "summaries") # Ensure this matches your table name
+# Environment variable for the characters table name (matches SAM template)
+# Assuming your template uses DDB_CHARACTER_SUMMARIES_TABLE for the table name
+DDB_TABLE_NAME = os.getenv("DDB_CHARACTER_SUMMARIES_TABLE", "characters") # Ensure this matches your table name
 # Environment variable for the Gemini API Key directly
-GEMINI_API_KEY_ENV = os.getenv("GEMINI_API_KEY") # Renamed to avoid conflict with global var
+GEMINI_API_KEY_ENV = os.getenv("GEMINI_API_KEY") # Use API_KEY env var
 REGION = os.getenv("AWS_REGION", "us-east-1")
 
 # AWS Clients
 s3 = boto3.client("s3")
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
-# Get the DynamoDB table resource using the environment variable name
-table = dynamodb.Table(DDB_SUMMARIES_TABLE_NAME)
+table = dynamodb.Table(DDB_TABLE_NAME)
 # Removed ssm client
 
 # Global variable to store API key (fetched once from env var)
@@ -69,7 +69,7 @@ def _call_gemini(prompt: str, text: str) -> str:
 
     for attempt in range(max_retries):
         try:
-            logger.info(f"Calling Gemini API for summarization (Attempt {attempt + 1}/{max_retries})...")
+            logger.info(f"Calling Gemini API for character extraction (Attempt {attempt + 1}/{max_retries})...")
             resp = requests.post(
                 GEMINI_URL,
                 headers={"Content-Type": "application/json"},
@@ -88,7 +88,7 @@ def _call_gemini(prompt: str, text: str) -> str:
                     .get("text", "")
                     .strip()
             )
-            logger.debug(f"Generated summary text snippet: {generated_text[:200]}...") # Log snippet
+            logger.debug(f"Generated character text snippet: {generated_text[:200]}...") # Log snippet
             return generated_text
 
         except requests.exceptions.HTTPError as e:
@@ -108,32 +108,31 @@ def _call_gemini(prompt: str, text: str) -> str:
     raise RuntimeError(f"Gemini API rate limit exceeded after {max_retries} retries.")
 
 
-def _summarize_text_slice(text: str) -> str:
-    """Generates a summary for a slice of text using the Gemini API."""
+def _get_characters(text: str) -> str:
+    """Generates a character list using the Gemini API."""
     prompt = (
-        "Provide a concise recap under 250-300 words of the following book content. "
-        "Focus on key events and characters."
+        "Provide a concise list of all the characters appeared in the book similar to x-ray feature of prime video. "
+        "This character list should also have a one liner about the character. "
+        "Just give me the list and not anything else."
     )
     try:
         return _call_gemini(prompt, text)
     except Exception as e:
-        logger.error(f"Failed to get summary from Gemini: {e}")
+        logger.error(f"Failed to get characters from Gemini: {e}")
         # fallback: truncate raw text
         return text[:400] + " …[truncated]" if len(text) > 400 else text
 
-
-def generate_percentage_summaries(book_json: dict, user_id: str, book_id: str):
-    """Generates summaries at percentage intervals and saves to DynamoDB."""
-    logger.info("Generating percentage summaries.")
+def generate_percentage_characters(book_json: dict, user_id: str, book_id: str) -> List[Dict]:
+    """Generates character lists at percentage intervals and saves to DynamoDB."""
+    logger.info("Generating percentage characters.")
     full_text = "".join(_flatten_paragraphs(book_json))
     total_len = len(full_text)
     if total_len == 0:
-        logger.warning("Book has no text content for summarization.")
-        return
+        logger.warning("Book has no text content.")
+        return []
 
+    characters_to_save: List[Dict] = []
     last_end = -1 # To avoid processing the same slice if total_len is small
-
-    summaries_to_save: List[Dict] = [] # Collect items for batch write
 
     # Process at each PERCENT_STEP interval
     for pct in range(PERCENT_STEP, 101, PERCENT_STEP):
@@ -143,18 +142,18 @@ def generate_percentage_summaries(book_json: dict, user_id: str, book_id: str):
             continue
 
         slice_text = full_text[:end_idx]
-        logger.info(f"Processing up to {pct}% ({len(slice_text)} characters) for summary.")
+        logger.info(f"Processing up to {pct}% ({len(slice_text)} characters).")
 
-        # Generate summary for this slice
-        summary_text = _summarize_text_slice(slice_text)
+        # Generate characters for this slice
+        text_characters = _get_characters(slice_text)
 
         # Prepare item for DynamoDB
-        # --- ITEM KEYS MATCHING YOUR PROVIDED SUMMARIES TABLE SCHEMA ---
-        summaries_to_save.append({
+        # --- ITEM KEYS MATCHING YOUR PROVIDED CHARACTERS TABLE SCHEMA ---
+        characters_to_save.append({
             "book_id": book_id, # Partition Key (String)
             "progress": pct,    # Sort Key (Number)
             "user_id": user_id, # Attribute (String)
-            "summary": summary_text, # Attribute (String)
+            "characters": text_characters, # Attribute (String)
             "createdAt": int(time.time()) # Add a timestamp (Number)
         })
         # --- END ITEM KEYS ---
@@ -165,13 +164,13 @@ def generate_percentage_summaries(book_json: dict, user_id: str, book_id: str):
         # but a small delay here could still help space out initial calls.
         # time.sleep(1) # Adjust as necessary
 
-    if summaries_to_save:
-        logger.info(f"Saving {len(summaries_to_save)} summary entries to DynamoDB.")
-        # Use batch_put_summaries to save the collected items
-        batch_put_summaries(summaries_to_save)
+    if characters_to_save:
+        logger.info(f"Saving {len(characters_to_save)} character entries to DynamoDB.")
+        batch_put_characters(characters_to_save)
     else:
-        logger.warning("No summary entries generated to save.")
+        logger.warning("No character entries generated to save.")
 
+    return characters_to_save # Return the list of items saved
 
 def download_json_from_s3(s3_bucket: str, s3_key: str) -> dict:
     """Downloads and parses a JSON file from S3."""
@@ -185,9 +184,9 @@ def download_json_from_s3(s3_bucket: str, s3_key: str) -> dict:
         logger.error(f"Failed to download or parse JSON from s3://{s3_bucket}/{s3_key}: {e}")
         raise # Re-raise the exception
 
-def batch_put_summaries(items: List[dict]):
+def batch_put_characters(items: List[dict]):
     """Writes a batch of items to the DynamoDB table."""
-    logger.info(f"Starting batch write to DynamoDB table: {DDB_SUMMARIES_TABLE_NAME}")
+    logger.info(f"Starting batch write to DynamoDB table: {DDB_TABLE_NAME}")
     try:
         with table.batch_writer() as batch:
             for item in items:
@@ -202,7 +201,7 @@ def batch_put_summaries(items: List[dict]):
 def lambda_handler(event, context):
     """
     Trigger source: SQS message containing payload from normalize-books lambda.
-    Downloads normalized JSON, generates summaries at intervals,
+    Downloads normalized JSON, generates character summaries at intervals,
     and saves to DynamoDB.
     """
     logger.info(f"Received SQS event with {len(event.get('Records', []))} records.")
@@ -241,8 +240,8 @@ def lambda_handler(event, context):
             # Download normalized JSON file from S3
             book_json = download_json_from_s3(s3_bucket, s3_key)
 
-            # Generate summaries at percentage intervals and save to DB
-            generate_percentage_summaries(book_json, user_id, book_id)
+            # Generate characters at percentage intervals and save to DB
+            generate_percentage_characters(book_json, user_id, book_id)
 
             logger.info(f"✓ Successfully processed SQS record {sqs_record.get('messageId')}")
             processed_records_count += 1
@@ -257,8 +256,8 @@ def lambda_handler(event, context):
     return {
         'statusCode': 200,
         'body': json.dumps({
-            "status": "summary_summarization_batch_complete",
+            "status": "character_summarization_batch_complete",
             "processed_count": processed_records_count,
-            "message": f"Successfully processed {processed_records_count} SQS records for summary summarization."
+            "message": f"Successfully processed {processed_records_count} SQS records for character summarization."
         })
     }
