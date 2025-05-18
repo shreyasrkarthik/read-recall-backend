@@ -92,10 +92,10 @@ Resources:
   GeneratePresignedUrlFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: generatePresignedUploadUrl
+      FunctionName: generate_presigned_upload_url
       Handler: app.lambda_handler
       Runtime: python3.9
-      CodeUri: lambdas/generatePresignedUploadUrl/
+      CodeUri: lambdas/generate_presigned_upload_url/
       MemorySize: 128
       Timeout: 10
       Environment:
