@@ -64,3 +64,5 @@ upload_service/*.log
 /tmp/
 .aws-sam
 samconfig.toml
+
+**/node_modules/**
