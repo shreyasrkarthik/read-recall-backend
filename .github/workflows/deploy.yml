@@ -1,0 +1,100 @@
+name: Deploy ReadRecall
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  cdk-diff:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write        # OIDC to AWS
+      contents: read
+      pull-requests: write   # To comment on PRs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - name: Install CDK and dependencies
+        working-directory: ./infrastructure
+        run: |
+          npm install -g aws-cdk
+          python -m pip install --upgrade pip
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -r requirements.txt
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ReadRecallInfraCI
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: CDK Diff – fail on new resources
+        working-directory: ./infrastructure
+        run: |
+          source .venv/bin/activate
+          npx cdk diff --fail --strict ReadRecallStack > diff.txt || { cat diff.txt; exit 1; }
+      - name: Upload diff as artifact
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cdk-diff
+          path: infrastructure/diff.txt
+          retention-days: 7
+      - name: Comment PR with diff
+        if: github.event_name == 'pull_request' && (success() || failure())
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const diff = fs.readFileSync('infrastructure/diff.txt', 'utf8');
+            const body = `## CDK Diff Result
+            
+            \`\`\`
+            ${diff}
+            \`\`\`
+            `;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+  deploy:
+    needs: cdk-diff
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write        # OIDC to AWS
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - name: Install CDK and dependencies
+        working-directory: ./infrastructure
+        run: |
+          npm install -g aws-cdk
+          python -m pip install --upgrade pip
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -r requirements.txt
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ReadRecallInfraCI
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Deploy CDK Stack
+        working-directory: ./infrastructure
+        run: |
+          source .venv/bin/activate
+          npx cdk deploy ReadRecallStack --require-approval never

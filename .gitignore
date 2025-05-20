@@ -62,5 +62,13 @@ upload_service/*.log
 
 # Ignore test uploads
 /tmp/
-.aws-sam
-samconfig.toml
+# AWS CDK
+cdk.out/
+.cdk.staging/
+.cdk-assets/
+**/*.js.map
+infrastructure/.venv/
+infrastructure/.env
+infrastructure/*.swp
+infrastructure/*.egg-info
+infrastructure/cdk.context.json
