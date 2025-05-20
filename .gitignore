@@ -60,15 +60,3 @@ upload_service/*.pyc
 upload_service/*.pyo
 upload_service/*.log
 
-# Ignore test uploads
-/tmp/
-# AWS CDK
-cdk.out/
-.cdk.staging/
-.cdk-assets/
-**/*.js.map
-infrastructure/.venv/
-infrastructure/.env
-infrastructure/*.swp
-infrastructure/*.egg-info
-infrastructure/cdk.context.json
