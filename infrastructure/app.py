@@ -4,7 +4,6 @@ import os
 import aws_cdk as cdk
 
 from infrastructure.infrastructure_stack import ReadRecallStack
-from infrastructure.iam_roles_stack import IamRolesStack
 
 
 app = cdk.App()
@@ -31,7 +30,6 @@ ReadRecallStack(app, "ReadRecallStack",
     # For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html
     )
 
-# IAM roles and policies stack
-IamRolesStack(app, "IamRolesStack", env=env)
+# IAM roles stack has been removed
 
 app.synth()
